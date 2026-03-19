@@ -112,7 +112,7 @@ a{color:var(--accent)}
   </div>
 
   <!-- Auth -->
-  <div id="authBar" style="display:none;margin-bottom:18px"><div style="display:flex;align-items:center;gap:14px;padding:16px 20px;background:var(--orangeG);border:1px solid rgba(212,138,58,.15);border-radius:10px"><span style="font-size:14px;color:var(--orange);flex:1">Connect Google Calendar to see your schedule</span><button class="btn" style="border-color:var(--orange);color:var(--orange)" onclick="gAuth()">Sign in with Google</button></div></div>
+  <div id="authBar" style="display:none;margin-bottom:18px"><div style="display:flex;align-items:center;gap:14px;padding:18px 22px;background:var(--orangeG);border:1px solid rgba(212,138,58,.2);border-radius:12px"><span style="font-size:15px;color:var(--orange);flex:1">🔗 Connect your Google Calendar to see today's schedule</span><button class="btn-p" style="background:linear-gradient(135deg,var(--orange),#e09a44);padding:12px 24px;font-size:14px" onclick="gAuth()">Sign in with Google</button></div></div>
   <div id="authOk" style="display:none;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--green);padding:0 4px"><span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block"></span> Calendar connected<button class="btn" style="margin-left:auto;padding:5px 12px;font-size:10px" onclick="gOut()">Sign out</button><button class="btn" style="padding:5px 12px;font-size:10px" onclick="openSetup()">⚙</button></div></div>
 
   <!-- Yesterday -->
@@ -132,7 +132,7 @@ a{color:var(--accent)}
     <div id="adBar" style="display:none;margin-top:18px;padding:16px;border-radius:8px;background:var(--greenG);border:1px solid rgba(94,168,112,.15);text-align:center;font-family:var(--serif);font-size:18px;color:var(--green)">All priorities complete.</div></div>
 
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><div class="card-label" style="margin-bottom:0">Calendar</div><div style="display:flex;gap:5px"><button class="btn btn-a" id="cvD" onclick="setCV('day')">DAY</button><button class="btn" id="cvW" onclick="setCV('week')">WEEK</button><button class="btn" style="margin-left:8px" onclick="fetchCal()">↻</button></div></div>
-    <div id="calC"><div style="padding:40px 0;text-align:center;color:var(--muted);font-size:14px">Connect Google Calendar above ↑</div></div></div>
+    <div id="calC"><div style="padding:40px 0;text-align:center;color:var(--muted);font-size:14px">Sign in with Google above to see your schedule</div></div></div>
   </div>
 
   <div class="grid-2">
@@ -190,11 +190,13 @@ function initGA(){if(!CFG.cid)return;
     $("authBar").style.display="none";$("authOk").style.display="block";
     fetchCal();return;
   }
+  // No valid saved token — show sign-in bar immediately
+  $("authBar").style.display="block";$("authOk").style.display="none";
   // Init token client
   try{
     tokC=google.accounts.oauth2.initTokenClient({client_id:CFG.cid,scope:SCOPES,
       callback:r=>{
-        if(r.error){console.error("Auth:",r);return}
+        if(r.error){console.error("Auth:",r);$("authBar").style.display="block";$("authOk").style.display="none";return}
         tok=r.access_token;
         tokExp=Date.now()+(r.expires_in||3600)*1000;
         localStorage.setItem("cmd-gtoken",tok);
@@ -203,21 +205,20 @@ function initGA(){if(!CFG.cid)return;
         fetchCal();
       }
     });
-    // Try silent auth first (no popup if user previously consented)
-    tokC.requestAccessToken({prompt:""});
+    // Don't try silent auth — it opens popups. Wait for user to click.
   }catch(e){console.error("GIS init:",e);$("authBar").style.display="block"}
 }
 function gAuth(){if(!tokC){alert("Google not loaded — refresh page.");return}tokC.requestAccessToken({prompt:"consent"})}
-function gOut(){if(tok)google.accounts.oauth2.revoke(tok);tok=null;localStorage.removeItem("cmd-gtoken");localStorage.removeItem("cmd-gtokenExp");$("authBar").style.display="block";$("authOk").style.display="none";$("calC").innerHTML='<div style="padding:40px 0;text-align:center;color:var(--muted);font-size:14px">Connect Google Calendar above ↑</div>'}
+function gOut(){if(tok)google.accounts.oauth2.revoke(tok);tok=null;localStorage.removeItem("cmd-gtoken");localStorage.removeItem("cmd-gtokenExp");$("authBar").style.display="block";$("authOk").style.display="none";$("calC").innerHTML='<div style="padding:40px 0;text-align:center;color:var(--muted);font-size:14px">Sign in with Google above to see your schedule</div>'}
 async function gFetch(ep,opts={}){if(!tok)return null;
   // Check token expiry
-  if(Date.now()>tokExp-60000){tok=null;localStorage.removeItem("cmd-gtoken");if(tokC)tokC.requestAccessToken({prompt:""});return null}
+  if(Date.now()>tokExp-60000){tok=null;localStorage.removeItem("cmd-gtoken");localStorage.removeItem("cmd-gtokenExp");$("authBar").style.display="block";$("authOk").style.display="none";return null}
   const r=await fetch(API+ep,{...opts,headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json",...(opts.headers||{})}});
-  if(r.status===401){tok=null;localStorage.removeItem("cmd-gtoken");if(tokC)tokC.requestAccessToken({prompt:""});return null}
+  if(r.status===401){tok=null;localStorage.removeItem("cmd-gtoken");localStorage.removeItem("cmd-gtokenExp");$("authBar").style.display="block";$("authOk").style.display="none";return null}
   return r.json()}
 
 // ═══ CALENDAR ═══
-async function fetchCal(){if(!tok)return;$("calC").innerHTML='<div style="padding:40px 0;text-align:center;color:var(--muted);font-size:14px;font-style:italic">Syncing...</div>';
+async function fetchCal(){if(!tok){$("calC").innerHTML='<div style="padding:40px 0;text-align:center;color:var(--orange);font-size:14px">Sign in with Google above to see your calendar</div>';return}$("calC").innerHTML='<div style="padding:40px 0;text-align:center;color:var(--muted);font-size:14px;font-style:italic">Syncing...</div>';
 const today=new Date(),mn=new Date(today);mn.setHours(0,0,0,0);let mx;if(calV==="day"){mx=new Date(today);mx.setHours(23,59,59,999)}else{mx=new Date(today);mx.setDate(mx.getDate()+(7-mx.getDay()));mx.setHours(23,59,59,999)}
 const p=new URLSearchParams({timeMin:mn.toISOString(),timeMax:mx.toISOString(),timeZone:CFG.tz,singleEvents:"true",orderBy:"startTime",maxResults:"50"});
 const d=await gFetch("/calendars/primary/events?"+p);if(!d||!d.items){calEv=[];renderCal();return}
@@ -342,12 +343,28 @@ function mLaunch(){
 }
 
 // ═══ INIT ═══
+function migrateConfig(){
+  // Fix old vault name stuck as "Research" from earlier version
+  const v=localStorage.getItem("cmd-vault");
+  if(!v||v==="Research"||v==='"Research"'){
+    localStorage.setItem("cmd-vault","Daily Notes");
+    CFG.vault="Daily Notes";
+  }
+  // Ensure folder is set
+  const f=localStorage.getItem("cmd-folder");
+  if(!f||f==="null"){
+    localStorage.setItem("cmd-folder","Daily Notes");
+    CFG.folder="Daily Notes";
+  }
+}
+
 function initDash(){$("main").style.display="block";
+migrateConfig();
 const st=LT("tasks"),si=LT("intention"),sr=LT("dayRunning",false),sa=LT("dayStartedAt");
 if(st&&st.length){tasks=st;intention=si||""}else showPlan();
 if(sr&&sa){dayOn=true;daySec=Math.floor((Date.now()-sa)/1000);dayInt=setInterval(()=>{daySec++;renderDT()},1000)}
 renderT();renderH();renderDT();renderY();renderL();renderTips();initScratch();
-const w=setInterval(()=>{if(typeof google!=="undefined"&&google.accounts){clearInterval(w);initGA()}},200);setTimeout(()=>clearInterval(w),10000)}
+const w=setInterval(()=>{if(typeof google!=="undefined"&&google.accounts){clearInterval(w);initGA()}},200);setTimeout(()=>{clearInterval(w);if(!tok)$("authBar").style.display="block"},10000)}
 
 (function(){if(CFG.cid)initDash();else $("setupScreen").style.display="block"})();
 </script>
