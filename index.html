@@ -65,8 +65,9 @@ a{color:var(--accent)}
     7. Go to <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank">API Library</a> → enable <strong>Google Calendar API</strong><br>
     8. Go to <strong>OAuth consent screen</strong> → Add yourself as test user</div>
     <input class="input" id="setupCid" placeholder="Paste your Google OAuth Client ID here" style="margin-top:8px"></div>
-  <div style="margin-bottom:24px"><div class="sn">STEP 2 — OBSIDIAN VAULT NAME</div><div class="st">Exactly as shown in Obsidian. Daily notes save to <code>Daily Notes/</code> folder.</div>
-    <input class="input" id="setupVault" placeholder="e.g. Research" value="Research" style="margin-top:8px"></div>
+  <div style="margin-bottom:24px"><div class="sn">STEP 2 — OBSIDIAN VAULT</div><div class="st">Vault name: exactly as shown in Obsidian's vault switcher (bottom-left). Folder: subfolder inside the vault where daily notes go.</div>
+    <input class="input" id="setupVault" placeholder="e.g. Daily Notes" value="Daily Notes" style="margin-top:8px">
+    <input class="input" id="setupFolder" placeholder="Subfolder for notes (e.g. Daily Notes)" value="Daily Notes" style="margin-top:8px"></div>
   <div style="margin-bottom:24px"><div class="sn">STEP 3 — TIMEZONE</div>
     <input class="input" id="setupTZ" value="America/Los_Angeles"></div>
   <button class="btn-p" style="width:100%;padding:16px;font-size:15px" onclick="saveSetup()">Save & Launch Dashboard →</button>
@@ -159,7 +160,7 @@ a{color:var(--accent)}
 <script>
 const SCOPES="https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
 const API="https://www.googleapis.com/calendar/v3";
-let CFG={cid:localStorage.getItem("cmd-cid")||"",vault:localStorage.getItem("cmd-vault")||"Research",tz:localStorage.getItem("cmd-tz")||"America/Los_Angeles"};
+let CFG={cid:localStorage.getItem("cmd-cid")||"",vault:localStorage.getItem("cmd-vault")||"Daily Notes",folder:localStorage.getItem("cmd-folder")||"Daily Notes",tz:localStorage.getItem("cmd-tz")||"America/Los_Angeles"};
 let tok=null,tokC=null,tasks=[],intention="",dayOn=false,daySec=0,dayInt=null,calV="day",calEv=[],editing=false,resI=-1,yOpen=true;
 const dk=()=>new Date().toISOString().slice(0,10);
 const yd=()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10)};
@@ -174,8 +175,8 @@ const pC=["var(--accent)","var(--blue)","var(--purple)","var(--green)","var(--or
 const pL=["P1","P2","P3","P4","P5"];
 
 // SETUP
-function openSetup(){$("main").style.display="none";$("setupScreen").style.display="block";$("setupCid").value=CFG.cid;$("setupVault").value=CFG.vault;$("setupTZ").value=CFG.tz}
-function saveSetup(){const c=$("setupCid").value.trim();if(!c){alert("Enter your Google OAuth Client ID");return}CFG={cid:c,vault:$("setupVault").value.trim()||"Research",tz:$("setupTZ").value.trim()||"America/Los_Angeles"};localStorage.setItem("cmd-cid",CFG.cid);localStorage.setItem("cmd-vault",CFG.vault);localStorage.setItem("cmd-tz",CFG.tz);$("setupScreen").style.display="none";initDash()}
+function openSetup(){$("main").style.display="none";$("setupScreen").style.display="block";$("setupCid").value=CFG.cid;$("setupVault").value=CFG.vault;$("setupFolder").value=CFG.folder;$("setupTZ").value=CFG.tz}
+function saveSetup(){const c=$("setupCid").value.trim();if(!c){alert("Enter your Google OAuth Client ID");return}CFG={cid:c,vault:$("setupVault").value.trim()||"Daily Notes",folder:$("setupFolder").value.trim()||"Daily Notes",tz:$("setupTZ").value.trim()||"America/Los_Angeles"};localStorage.setItem("cmd-cid",CFG.cid);localStorage.setItem("cmd-vault",CFG.vault);localStorage.setItem("cmd-folder",CFG.folder);localStorage.setItem("cmd-tz",CFG.tz);$("setupScreen").style.display="none";initDash()}
 function $(id){return document.getElementById(id)}
 function closeM(id){$(id).classList.remove("open")}
 
@@ -258,21 +259,22 @@ clearInterval(dayInt);dayOn=false;ST("dayRunning",false);renderDT();renderDB();c
 if(obs)eodObs()}
 
 // OBSIDIAN
+function obsPath(filename){return CFG.folder?CFG.folder+"/"+filename:filename}
 function planObs(){const d=dk(),now=new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
 let md=`# Daily Plan — ${new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}\n*${now}*\n\n## Intention\n${intention||""}\n\n## Big 5\n`;
 tasks.forEach((t,i)=>{md+=`- [ ] **P${i+1}** ${t.text} — ${t.hours}h\n`});
 md+=`\nTotal: ${tasks.reduce((a,t)=>a+t.hours,0)}h\n`;
-window.open(`obsidian://new?vault=${encodeURIComponent(CFG.vault)}&file=${encodeURIComponent("Daily Notes/"+d)}&content=${encodeURIComponent(md)}`,"_self")}
+window.open(`obsidian://new?vault=${encodeURIComponent(CFG.vault)}&file=${encodeURIComponent(obsPath(d))}&content=${encodeURIComponent(md)}`,"_self")}
 
 function eodObs(){const eod=LT("eod"),d=dk(),dn=tasks.filter(t=>t.done),un=tasks.filter(t=>!t.done);
 let md=`# Daily Review — ${new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}\n\n## Intention\n${intention||"(none)"}\n\n## Tasks (${dn.length}/${tasks.length} · ${eod?.time||"?"})\n`;
 dn.forEach(t=>{md+=`- [x] ${t.text} (${t.hours}h)\n`});un.forEach(t=>{md+=`- [ ] ${t.text} (${t.hours}h)\n`});
 md+=`\n## End of Day Notes\n${eod?.text||""}\n\n## Tomorrow's Focus\n${eod?.tomorrowFocus||""}\n`;
-window.open(`obsidian://new?vault=${encodeURIComponent(CFG.vault)}&file=${encodeURIComponent("Daily Notes/"+d)}&content=${encodeURIComponent(md)}&overwrite=true`,"_self")}
+window.open(`obsidian://new?vault=${encodeURIComponent(CFG.vault)}&file=${encodeURIComponent(obsPath(d))}&content=${encodeURIComponent(md)}&overwrite=true`,"_self")}
 
 function scratchObs(){const t=$("scratch").value;if(!t.trim())return;
 const now=new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
-window.open(`obsidian://new?vault=${encodeURIComponent(CFG.vault)}&file=${encodeURIComponent("Daily Notes/"+dk())}&content=${encodeURIComponent(`\n---\n## Notes (${now})\n${t}\n`)}&append=true`,"_self")}
+window.open(`obsidian://new?vault=${encodeURIComponent(CFG.vault)}&file=${encodeURIComponent(obsPath(dk()))}&content=${encodeURIComponent(`\n---\n## Notes (${now})\n${t}\n`)}&append=true`,"_self")}
 
 // YESTERDAY
 function renderY(){const n=L("eod-"+yd());if(!n){$("yBan").style.display="none";return}$("yBan").style.display="block";
